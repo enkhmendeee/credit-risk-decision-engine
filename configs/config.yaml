@@ -1,0 +1,30 @@
+data:
+  raw_dir: data/raw
+  interim_dir: data/interim
+  processed_dir: data/processed
+  target_column: default
+  test_size: 0.2
+  random_seed: 42
+
+features:
+  numeric_cols: []
+  categorical_cols: []
+  drop_cols: []
+
+model:
+  type: xgboost  # xgboost | lightgbm | logistic_regression
+  params:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+
+training:
+  cv_folds: 5
+  scoring: roc_auc
+
+output:
+  model_dir: models
+  reports_dir: reports

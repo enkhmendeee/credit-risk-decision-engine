@@ -1,20 +1,53 @@
-# Data - too large for git
-data/
+# Data - too large for git (keep directory structure via .gitkeep)
+data/**
+!data/**/.gitkeep
 
 # Virtual environment
 venv/
+.venv/
+env/
 
 # Jupyter checkpoints
 .ipynb_checkpoints/
+*.ipynb_checkpoints
 
 # Model artifacts (large files)
 models/*.pkl
 models/*.joblib
+models/*.h5
+models/*.pt
+models/*.onnx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Type checking
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
 
 # System files
 .DS_Store
-__pycache__/
-*.pyc
+Thumbs.db
 
 # Environment variables
 .env
+
+# MLflow / experiment tracking
+mlruns/
+mlartifacts/
