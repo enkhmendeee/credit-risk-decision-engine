@@ -16,6 +16,7 @@ Run locally with::
 """
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -137,19 +138,35 @@ state: dict[str, Any] = {}
 
 
 def _compute_training_medians() -> dict[str, float]:
-    """Compute the median value of each model feature from the engineered CSV.
+    """Load per-feature medians used to impute missing fields at inference.
 
-    The processed CSV has raw string categoricals; we reproduce the training
-    pipeline's ``LabelEncoder`` step so medians line up with the numeric space
-    the model was fit on.
+    Prefers a pre-computed ``models/feature_medians.json`` so containers
+    built without ``data/`` are self-sufficient. Falls back to computing
+    from the training CSV for local/dev runs, and caches the result back
+    to JSON so the next startup (and the next Docker build) can skip the
+    CSV path entirely.
     """
+    json_path = _MODEL_PATH.parent / "feature_medians.json"
+    if json_path.exists():
+        with open(json_path, "r") as f:
+            return {k: float(v) for k, v in json.load(f).items()}
+
     csv_path = repo_root() / _cfg["data"]["processed_dir"] / "train_engineered.csv"
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"No median source found. Expected either {json_path} (preferred) "
+            f"or {csv_path} (fallback)."
+        )
     df = pd.read_csv(csv_path)
     le = LabelEncoder()
     for col in df.select_dtypes(include="object").columns:
         df[col] = le.fit_transform(df[col].astype(str))
     df = df.drop(columns=["TARGET", "SK_ID_CURR"], errors="ignore")
-    return df[FEATURE_NAMES].median().to_dict()
+    medians = {k: float(v) for k, v in df[FEATURE_NAMES].median().to_dict().items()}
+    with open(json_path, "w") as f:
+        json.dump(medians, f)
+    logger.info("cached feature medians to %s", json_path)
+    return medians
 
 
 @asynccontextmanager

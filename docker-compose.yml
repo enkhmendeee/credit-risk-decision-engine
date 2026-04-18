@@ -1,0 +1,15 @@
+services:
+  credit-risk-api:
+    build: .
+    image: credit-risk-api:latest
+    container_name: credit-risk-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount models/ so a retrained artifact on the host is picked up
+      # without rebuilding the image. The container reloads on restart.
+      - ./models:/app/models
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped

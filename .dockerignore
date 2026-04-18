@@ -1,0 +1,34 @@
+# Large / irrelevant directories (per project guidance)
+data/
+notebooks/
+venv/
+mlruns/
+.git/
+__pycache__/
+
+# Common Python / tooling noise
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Local experiment tracking
+mlflow.db
+
+# Env files (compose reads .env at runtime from the host, not from the image)
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Tests + reports aren't needed by the runtime
+tests/
+reports/
