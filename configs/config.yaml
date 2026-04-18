@@ -28,3 +28,11 @@ training:
 output:
   model_dir: models
   reports_dir: reports
+
+policy:
+  low_threshold: 0.30
+  high_threshold: 0.60
+
+mlflow:
+  experiment_name: credit-risk-engine
+  tracking_uri: ./mlruns

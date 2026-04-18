@@ -20,6 +20,9 @@ ipykernel>=6.0
 pyyaml>=6.0
 python-dotenv>=1.0
 
+# Experiment tracking
+mlflow>=2.10
+
 # Testing
 pytest>=7.4
 pytest-cov>=4.1

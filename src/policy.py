@@ -13,9 +13,17 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score
 
-# Default band cutoffs (calibrated-probability space).
-DEFAULT_T_LOW = 0.30
-DEFAULT_T_HIGH = 0.60
+from .config import load_config
+
+# Default band cutoffs (calibrated-probability space). Read from config at
+# import time so a single source of truth lives in ``configs/config.yaml``.
+try:
+    _cfg = load_config()
+    DEFAULT_T_LOW = float(_cfg["policy"]["low_threshold"])
+    DEFAULT_T_HIGH = float(_cfg["policy"]["high_threshold"])
+except (FileNotFoundError, KeyError):
+    DEFAULT_T_LOW = 0.30
+    DEFAULT_T_HIGH = 0.60
 
 
 def assign_risk_band(
