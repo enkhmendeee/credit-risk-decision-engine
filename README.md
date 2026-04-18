@@ -145,11 +145,12 @@ make docker-stop
 
 ## Live Demo
 
-```
+```bash
 
 [Analyst Dashboard](https://your-streamlit-link.streamlit.app)  
 [API Docs](https://your-api-link.com/docs)  
 [MLflow UI](https://your-mlflow-link.com)
+```
 
 ---
 
