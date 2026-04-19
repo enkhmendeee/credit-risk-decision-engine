@@ -5,7 +5,10 @@ scikit-learn>=1.3
 scipy>=1.11
 
 # Gradient boosting
-xgboost>=2.0
+# xgboost + shap pinned to a known-compatible pair: newer xgboost JSON booster
+# dumps trip SHAP's tree parser with errors like
+# "could not convert string to float: '[4.9135506E-1]'".
+xgboost==2.0.3
 lightgbm>=4.0
 
 # Visualization
@@ -28,7 +31,8 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 
 # Explainability + dashboard
-shap>=0.44
+# Pinned alongside xgboost==2.0.3 — see note above.
+shap==0.44.1
 streamlit>=1.30
 plotly>=5.18
 

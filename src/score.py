@@ -157,7 +157,11 @@ def score_applicant(
     explainer
         A fitted ``shap.TreeExplainer`` on ``model.base_model``. If the
         applicant lands in the HIGH band and ``explainer`` is None, one is
-        created on the fly (requires ``shap``).
+        created on the fly (requires ``shap``). Any failure inside SHAP
+        (notably the xgboost/shap version-mismatch error
+        ``could not convert string to float: '[4.9135506E-1]'``) is
+        swallowed — the call still returns a probability and band, just
+        with an empty ``adverse_action_reasons`` list.
 
     Returns
     -------
@@ -177,17 +181,58 @@ def score_applicant(
 
     reasons: list[str] = []
     if band == "HIGH":
-        if explainer is None:
-            import shap  # local import keeps the dependency optional
-            explainer = shap.TreeExplainer(model.base_model)
-        shap_vals = np.asarray(explainer.shap_values(x))[0]
-        reasons = _top_shap_reasons(shap_vals, feature_names, x.iloc[0], top_n=3)
+        reasons = _safe_shap_reasons(model, x, feature_names, explainer)
 
     return {
         "default_probability": prob,
         "risk_band": band,
         "adverse_action_reasons": reasons,
     }
+
+
+def _safe_shap_reasons(
+    model,
+    x: pd.DataFrame,
+    feature_names: list[str],
+    explainer=None,
+) -> list[str]:
+    """Compute adverse-action reasons, swallowing SHAP/XGBoost incompatibilities.
+
+    Some xgboost / shap version pairs raise inside ``TreeExplainer.shap_values``
+    with messages like ``could not convert string to float: '[4.9135506E-1]'``
+    when SHAP tries to parse the booster dump. We try two builds of the
+    explainer (raw tree, then the calibrated wrapper) before giving up. A
+    failure here is non-fatal: the caller still gets a probability and band,
+    just no reason codes.
+    """
+    try:
+        import shap  # local import keeps the dependency optional
+    except ImportError:
+        return []
+
+    # Two attempts: the raw booster (preferred — SHAP runs natively on trees),
+    # then the calibrated wrapper (more compatible across SHAP versions because
+    # SHAP falls back to a generic explainer path).
+    candidates = []
+    if explainer is not None:
+        candidates.append(explainer)
+    else:
+        for build in (
+            lambda: shap.TreeExplainer(model.base_model),
+            lambda: shap.TreeExplainer(model),
+        ):
+            try:
+                candidates.append(build())
+            except Exception:
+                continue
+
+    for expl in candidates:
+        try:
+            shap_vals = np.asarray(expl.shap_values(x))[0]
+            return _top_shap_reasons(shap_vals, feature_names, x.iloc[0], top_n=3)
+        except Exception:
+            continue
+    return []
 
 
 def score_batch(
