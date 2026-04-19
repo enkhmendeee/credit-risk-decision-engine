@@ -270,21 +270,34 @@
     .reasons li { margin-bottom: 4px; }
 
     details.raw {
-      margin-top: 16px;
+      margin-top: 24px;
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       background: #f8fafc;
     }
+    details.raw[hidden] { display: none; }
     details.raw summary {
       cursor: pointer;
       padding: 10px 14px;
       font-size: 13px;
       color: var(--text-muted);
       user-select: none;
+      font-weight: 600;
+    }
+    details.raw .raw-section { padding: 0 14px 12px; }
+    details.raw .raw-section h4 {
+      margin: 6px 0 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--text-muted);
     }
     details.raw pre {
       margin: 0;
-      padding: 0 14px 14px;
+      padding: 10px 12px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
       color: var(--text);
@@ -292,6 +305,7 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+    details.raw pre.error { background: #fef2f2; border-color: #fecaca; color: #7f1d1d; }
 
     /* ---------- Error box ---------- */
     .error-box {
@@ -456,14 +470,24 @@
         <h3>Top contributing risk factors</h3>
         <ol id="reasonsList"></ol>
       </div>
-
-      <details class="raw">
-        <summary>Raw API response</summary>
-        <pre id="rawJson">{}</pre>
-      </details>
     </section>
 
   </div>
+
+  <!-- Debug panel: shows the exact request that was sent and the response (or error)
+       returned by the API. Visible after the first submit attempt regardless of outcome,
+       so failures can be diagnosed without opening DevTools. -->
+  <details class="raw" id="rawDetails" hidden>
+    <summary>Request &amp; response (debug)</summary>
+    <div class="raw-section">
+      <h4>Request payload (sent to API)</h4>
+      <pre id="rawRequest">{}</pre>
+    </div>
+    <div class="raw-section">
+      <h4>Response</h4>
+      <pre id="rawResponse">{}</pre>
+    </div>
+  </details>
 </main>
 
 <footer class="site">
@@ -486,16 +510,9 @@
 
 // ---------- Constants ----------
 
-// Categorical encodings must match the LabelEncoder fit in src/train.py
-// (sorted-unique-value order). These mirror dashboard/app.py.
-const GENDER_ENCODING = { F: 0, M: 1 };
-const EDUCATION_ENCODING = {
-  "Academic degree":               0,
-  "Higher education":              1,
-  "Incomplete higher":             2,
-  "Lower secondary":               3,
-  "Secondary / secondary special": 4,
-};
+// Categorical fields are sent as raw strings ("M"/"F", "Higher education", …).
+// The API owns the label-encoding step, so the wire format stays human-readable
+// and the frontend can't drift out of sync with the model's encoding scheme.
 
 const REQUEST_TIMEOUT_MS = 60_000;  // generous: Render free tier cold-start
 
@@ -518,34 +535,57 @@ const els = {
   probPct:      $("probPct"),
   reasonsBlock: $("reasonsBlock"),
   reasonsList:  $("reasonsList"),
-  rawJson:      $("rawJson"),
+  rawDetails:   $("rawDetails"),
+  rawRequest:   $("rawRequest"),
+  rawResponse:  $("rawResponse"),
 };
 
 // ---------- Form → API payload ----------
 
+function readNumber(id) {
+  // Read a numeric input as a JS number. Returns:
+  //   null      if the field is empty / whitespace (caller can decide whether
+  //             that means "missing" or "invalid")
+  //   NaN       if there was something in the box but it didn't parse
+  //   number    on success
+  //
+  // Important: the raw `.value` of an empty <input type="number"> is the
+  // empty string "", which `parseFloat("")` turns into NaN. We collapse that
+  // to `null` here so payload assembly can JSON-encode it as null instead of
+  // shipping a phantom NaN/empty string to the API.
+  const raw = $(id).value;
+  if (raw === null || raw === undefined) return null;
+  const trimmed = String(raw).trim();
+  if (trimmed === "") return null;
+  return parseFloat(trimmed);
+}
+
 function readForm() {
   // Returns either a validated form object or { error: "..." }.
-  // Use parseFloat / parseInt explicitly so values are JS numbers, never strings.
-  // (Number() and the unary + operator can return surprising results for things
-  // like empty strings; the explicit parsers behave predictably here.)
-  const flt = (id) => parseFloat($(id).value);
-  const int = (id) => parseInt($(id).value, 10);
-
-  const ext1 = flt("ext1"), ext2 = flt("ext2"), ext3 = flt("ext3");
-  const age  = int("age");
-  const income = flt("income"), credit = flt("credit"), annuity = flt("annuity");
+  // Every numeric field uses parseFloat (via readNumber) — including AGE.
+  // For AGE we round to an integer at use-time; we don't `parseInt` here
+  // because parseInt silently chops "35.7" to 35, which would mask a typo
+  // we'd rather flag during validation.
+  const ext1    = readNumber("ext1");
+  const ext2    = readNumber("ext2");
+  const ext3    = readNumber("ext3");
+  const age     = readNumber("age");
+  const income  = readNumber("income");
+  const credit  = readNumber("credit");
+  const annuity = readNumber("annuity");
 
   const inRange = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
 
   // Tag invalid fields visually so the user can see what to fix.
+  // null (empty input) and NaN (unparseable) both fail inRange / >0 checks.
   const checks = [
-    ["ext1", inRange(ext1, 0, 1)],
-    ["ext2", inRange(ext2, 0, 1)],
-    ["ext3", inRange(ext3, 0, 1)],
-    ["age",  inRange(age, 18, 70)],
-    ["income",  income > 0],
-    ["credit",  credit > 0],
-    ["annuity", annuity > 0],
+    ["ext1",    inRange(ext1, 0, 1)],
+    ["ext2",    inRange(ext2, 0, 1)],
+    ["ext3",    inRange(ext3, 0, 1)],
+    ["age",     inRange(age, 18, 70)],
+    ["income",  Number.isFinite(income)  && income  > 0],
+    ["credit",  Number.isFinite(credit)  && credit  > 0],
+    ["annuity", Number.isFinite(annuity) && annuity > 0],
   ];
   let firstBad = null;
   for (const [id, ok] of checks) {
@@ -568,18 +608,17 @@ function buildPayload(form) {
   // (EXT_SOURCE_*, ratios) are computed here so the backend doesn't have to
   // mix user values with median-imputed derivatives.
   //
-  // Defensive coercion: re-run parseFloat / parseInt on every numeric field
-  // even though readForm() already parsed them. This guarantees every
-  // numeric leaf in the JSON body is a JavaScript number — never a string,
-  // never an array, never scientific-notation text like "[4.9135506E-1]".
-  const ext1 = parseFloat(form.ext1);
-  const ext2 = parseFloat(form.ext2);
-  const ext3 = parseFloat(form.ext3);
-
+  // Defensive coercion: re-run parseFloat on every numeric field even though
+  // readForm() already parsed them. This guarantees every numeric leaf in
+  // the JSON body is a JavaScript number — never a string, never an array,
+  // never scientific-notation text like "[4.9135506E-1]".
+  const ext1    = parseFloat(form.ext1);
+  const ext2    = parseFloat(form.ext2);
+  const ext3    = parseFloat(form.ext3);
   const income  = parseFloat(form.income);
   const credit  = parseFloat(form.credit);
   const annuity = parseFloat(form.annuity);
-  const age     = parseInt(form.age, 10);
+  const age     = parseFloat(form.age);
 
   const ext_mean = (ext1 + ext2 + ext3) / 3;
   const ext_min  = Math.min(ext1, ext2, ext3);
@@ -597,8 +636,8 @@ function buildPayload(form) {
     AMT_ANNUITY:         annuity,
     AGE_YEARS:           age,
     DAYS_BIRTH:          -Math.round(age * 365.25),  // backend convention: negative days from today
-    CODE_GENDER:         GENDER_ENCODING[form.gender],
-    NAME_EDUCATION_TYPE: EDUCATION_ENCODING[form.education],
+    CODE_GENDER:         form.gender,     // "M" or "F" — encoded server-side
+    NAME_EDUCATION_TYPE: form.education,  // category string — encoded server-side
 
     // Derived features (recomputed for internal consistency)
     EXT_SOURCE_MEAN:     ext_mean,
@@ -706,8 +745,18 @@ function renderResult(payload, raw) {
     els.reasonsBlock.hidden = true;
   }
 
-  els.rawJson.textContent = JSON.stringify(raw, null, 2);
   els.resultCard.hidden = false;
+}
+
+function showRequest(payload) {
+  els.rawRequest.textContent = JSON.stringify(payload, null, 2);
+  els.rawDetails.hidden = false;
+}
+
+function showResponse(raw, isError = false) {
+  els.rawResponse.textContent = JSON.stringify(raw, null, 2);
+  els.rawResponse.classList.toggle("error", isError);
+  els.rawDetails.hidden = false;
 }
 
 // ---------- Tiny utilities ----------
@@ -743,12 +792,22 @@ els.form.addEventListener("submit", async (ev) => {
 
   const payload = buildPayload(form);
 
+  // Surface the exact JSON that's about to go on the wire — both in the
+  // collapsible debug panel (always visible after first submit) and in the
+  // browser console for copy/paste into curl during debugging.
+  console.log("POST " + url + " body:\n" + JSON.stringify(payload, null, 2));
+  showRequest(payload);
+
   setLoading(true);
   try {
     const raw = await postScore(url, payload);
+    showResponse(raw, false);
     renderResult(payload, raw);
   } catch (err) {
     showError(err.message);
+    // Even on failure, dump what came back (or what threw) into the debug panel
+    // so the user can compare it against the request without opening DevTools.
+    showResponse({ error: err.message }, true);
   } finally {
     setLoading(false);
   }

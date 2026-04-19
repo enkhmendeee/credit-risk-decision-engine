@@ -232,6 +232,47 @@ app.add_middleware(
 # --- Helpers ------------------------------------------------------------------
 
 
+# --- Categorical encoding ----------------------------------------------------
+#
+# The training pipeline (src/train.py:load_processed_data) label-encodes every
+# string column with an sklearn LabelEncoder, which assigns integers in the
+# sorted-unique-value order of the values it sees. We don't persist the fitted
+# encoders, so we hard-code the maps for the two fields the demo client sends
+# as raw strings ("M"/"F" and the education category). Any other string-
+# categorical value the caller sends will fall through to ``_coerce_numeric``
+# below and ultimately fail with a clear "could not convert" error.
+#
+# These maps mirror the ones in dashboard/app.py and the LabelEncoder fit in
+# src/train.py — keep them in sync if a new category is added.
+
+_CATEGORICAL_ENCODERS: dict[str, dict[str, int]] = {
+    "CODE_GENDER": {"F": 0, "M": 1},
+    "NAME_EDUCATION_TYPE": {
+        "Academic degree":               0,
+        "Higher education":              1,
+        "Incomplete higher":             2,
+        "Lower secondary":               3,
+        "Secondary / secondary special": 4,
+    },
+}
+
+
+def _encode_categorical(feature: str, value: Any) -> Any:
+    """If ``feature`` is a known categorical and ``value`` is one of its
+    string labels, return the integer encoding the model was trained on.
+    Anything else (numbers, unknown features, unknown labels) passes through.
+    """
+    encoder = _CATEGORICAL_ENCODERS.get(feature)
+    if encoder is None or not isinstance(value, str):
+        return value
+    encoded = encoder.get(value)
+    if encoded is None:
+        # Already-encoded numeric strings (e.g. "1") will be picked up by
+        # _coerce_numeric next. Unknown labels also fall through unchanged.
+        return value
+    return encoded
+
+
 def _coerce_numeric(value: Any) -> Any:
     """Convert string-encoded numbers to ``float``; pass everything else through.
 
@@ -251,15 +292,22 @@ def _coerce_numeric(value: Any) -> Any:
     return value
 
 
+def _prepare_value(feature: str, value: Any) -> Any:
+    """Encode known categorical strings, then numeric-coerce remaining strings."""
+    return _coerce_numeric(_encode_categorical(feature, value))
+
+
 def _fill_missing(raw: dict[str, Any]) -> dict[str, Any]:
     """Replace any ``None`` feature value with the training-set median.
 
-    Also coerces string-encoded numbers (e.g. ``"0.49"``) to ``float`` so that
-    careless clients that JSON-encode numbers as strings still score correctly.
+    Also encodes known categorical strings (``CODE_GENDER``,
+    ``NAME_EDUCATION_TYPE``) to their training-time integer codes, and coerces
+    string-encoded numbers (e.g. ``"0.49"``) to ``float`` so that careless
+    clients that JSON-encode numbers as strings still score correctly.
     """
     medians = state["medians"]
     return {
-        f: (_coerce_numeric(raw[f]) if raw.get(f) is not None else medians[f])
+        f: (_prepare_value(f, raw[f]) if raw.get(f) is not None else medians[f])
         for f in state["feature_names"]
     }
 
