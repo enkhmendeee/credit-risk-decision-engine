@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Credit Risk Decision Engine — Demo Client</title>
+  <meta name="description" content="Single-file demo client for the Credit Risk Decision Engine FastAPI service." />
+
+  <style>
+    /* ---------- Design tokens ---------- */
+    :root {
+      --bg:           #f4f6fa;
+      --surface:      #ffffff;
+      --text:         #0f172a;
+      --text-muted:   #475569;
+      --border:       #e2e8f0;
+      --primary:      #1e3a8a;
+      --primary-700:  #1e40af;
+
+      --approve:      #16a34a;
+      --review:       #f59e0b;
+      --reject:       #dc2626;
+
+      --shadow-sm:    0 1px 2px rgba(15, 23, 42, .06);
+      --shadow-md:    0 6px 20px rgba(15, 23, 42, .08);
+      --radius:       12px;
+      --radius-sm:    8px;
+    }
+
+    /* ---------- Reset / base ---------- */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+                   Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a { color: var(--primary-700); }
+
+    /* ---------- Layout ---------- */
+    header.site {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+      color: #fff;
+      padding: 28px 24px;
+    }
+    header.site .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    header.site h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: .3px;
+    }
+    header.site p {
+      margin: 4px 0 0;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+    header.site .badge {
+      background: rgba(255, 255, 255, .12);
+      border: 1px solid rgba(255, 255, 255, .25);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+
+    main {
+      flex: 1;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .api-config {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: var(--shadow-sm);
+    }
+    .api-config label {
+      font-size: 13px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .api-config input {
+      flex: 1;
+      min-width: 280px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-md);
+      padding: 24px;
+    }
+    .card h2 {
+      margin: 0 0 4px;
+      font-size: 18px;
+    }
+    .card .subtitle {
+      margin: 0 0 18px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* ---------- Form ---------- */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 16px;
+    }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: .3px;
+      text-transform: uppercase;
+    }
+    .field input,
+    .field select {
+      padding: 9px 11px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--text);
+    }
+    .field input:focus,
+    .field select:focus {
+      outline: 2px solid rgba(30, 64, 175, .25);
+      outline-offset: 0;
+      border-color: var(--primary-700);
+    }
+    .field .hint { font-size: 11px; color: var(--text-muted); }
+    .field.invalid input,
+    .field.invalid select {
+      border-color: var(--reject);
+      background: #fef2f2;
+    }
+
+    .actions {
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    button.primary {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    button.primary:hover:not(:disabled) { background: var(--primary-700); }
+    button.primary:disabled { opacity: .65; cursor: not-allowed; }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, .35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---------- Result ---------- */
+    .result-card[hidden] { display: none; }
+
+    .decision-badge {
+      border-radius: 10px;
+      padding: 22px 24px;
+      text-align: center;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+    .decision-badge.APPROVE { background: var(--approve); }
+    .decision-badge.REVIEW  { background: var(--review); }
+    .decision-badge.REJECT  { background: var(--reject); }
+    .decision-badge .label {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+    }
+    .decision-badge .prob {
+      font-size: 14px;
+      opacity: .92;
+      margin-top: 4px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .metric {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+    .metric .k {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: .4px;
+    }
+    .metric .v {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .reasons h3 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--text-muted);
+      margin: 4px 0 6px;
+    }
+    .reasons ol {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+    .reasons li { margin-bottom: 4px; }
+
+    details.raw {
+      margin-top: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #f8fafc;
+    }
+    details.raw summary {
+      cursor: pointer;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+      user-select: none;
+    }
+    details.raw pre {
+      margin: 0;
+      padding: 0 14px 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: var(--text);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* ---------- Error box ---------- */
+    .error-box {
+      margin-top: 16px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-left: 4px solid var(--reject);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      color: #7f1d1d;
+      font-size: 14px;
+    }
+    .error-box[hidden] { display: none; }
+    .error-box strong { display: block; margin-bottom: 4px; color: var(--reject); }
+    .error-box code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: rgba(220, 38, 38, .08);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 12.5px;
+    }
+
+    /* ---------- Footer ---------- */
+    footer.site {
+      max-width: 1100px;
+      width: 100%;
+      margin: 24px auto 32px;
+      padding: 0 24px;
+      color: var(--text-muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    footer.site .note {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      display: inline-block;
+    }
+  </style>
+</head>
+
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div>
+      <h1>Credit Risk Decision Engine</h1>
+      <p>Demo client — calibrated XGBoost scoring via FastAPI</p>
+    </div>
+    <span class="badge">Live API demo</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- API endpoint config (editable so the page can point at any deployment). -->
+  <section class="api-config">
+    <label for="apiUrl">API endpoint</label>
+    <input id="apiUrl" type="url" spellcheck="false"
+           value="https://credit-risk-decision-engine.onrender.com/score" />
+  </section>
+
+  <div class="grid">
+
+    <!-- ---------- Form card ---------- -->
+    <section class="card" aria-labelledby="form-title">
+      <h2 id="form-title">Applicant profile</h2>
+      <p class="subtitle">Fill in the fields below and submit to score against the live model.</p>
+
+      <form id="scoreForm" novalidate>
+        <div class="form-grid">
+
+          <div class="field">
+            <label for="ext1">EXT_SOURCE_1</label>
+            <input id="ext1" name="ext1" type="number" min="0" max="1" step="0.01" value="0.50" required />
+            <span class="hint">External credit bureau score 1 (0–1)</span>
+          </div>
+          <div class="field">
+            <label for="ext2">EXT_SOURCE_2</label>
+            <input id="ext2" name="ext2" type="number" min="0" max="1" step="0.01" value="0.50" required />
+            <span class="hint">External credit bureau score 2 (0–1)</span>
+          </div>
+          <div class="field">
+            <label for="ext3">EXT_SOURCE_3</label>
+            <input id="ext3" name="ext3" type="number" min="0" max="1" step="0.01" value="0.50" required />
+            <span class="hint">External credit bureau score 3 (0–1)</span>
+          </div>
+          <div class="field">
+            <label for="age">Age</label>
+            <input id="age" name="age" type="number" min="18" max="70" step="1" value="35" required />
+            <span class="hint">Years (18–70)</span>
+          </div>
+
+          <div class="field">
+            <label for="income">Annual Income ($)</label>
+            <input id="income" name="income" type="number" min="20000" max="2000000" step="1000" value="150000" required />
+          </div>
+          <div class="field">
+            <label for="credit">Credit Amount ($)</label>
+            <input id="credit" name="credit" type="number" min="20000" max="4000000" step="1000" value="500000" required />
+          </div>
+
+          <div class="field">
+            <label for="annuity">Annuity ($/yr)</label>
+            <input id="annuity" name="annuity" type="number" min="2000" max="300000" step="500" value="24000" required />
+          </div>
+          <div class="field">
+            <label for="gender">Gender</label>
+            <select id="gender" name="gender" required>
+              <option value="F">Female</option>
+              <option value="M">Male</option>
+            </select>
+          </div>
+
+          <div class="field full">
+            <label for="education">Education</label>
+            <select id="education" name="education" required>
+              <option value="Secondary / secondary special">Secondary / secondary special</option>
+              <option value="Higher education">Higher education</option>
+              <option value="Incomplete higher">Incomplete higher</option>
+              <option value="Lower secondary">Lower secondary</option>
+              <option value="Academic degree">Academic degree</option>
+            </select>
+          </div>
+
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="primary" id="submitBtn">
+            <span id="btnLabel">Score Applicant</span>
+            <span class="spinner" id="btnSpinner" hidden></span>
+          </button>
+        </div>
+      </form>
+
+      <div class="error-box" id="errorBox" hidden></div>
+    </section>
+
+    <!-- ---------- Result card ---------- -->
+    <section class="card result-card" id="resultCard" aria-live="polite" hidden>
+      <h2>Decision</h2>
+      <p class="subtitle">Returned by the calibrated XGBoost model.</p>
+
+      <div class="decision-badge" id="decisionBadge">
+        <div class="label" id="decisionLabel">—</div>
+        <div class="prob" id="decisionProb">—</div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="k">Risk band</div>
+          <div class="v" id="riskBand">—</div>
+        </div>
+        <div class="metric">
+          <div class="k">Default probability</div>
+          <div class="v" id="probPct">—</div>
+        </div>
+      </div>
+
+      <div class="reasons" id="reasonsBlock" hidden>
+        <h3>Top contributing risk factors</h3>
+        <ol id="reasonsList"></ol>
+      </div>
+
+      <details class="raw">
+        <summary>Raw API response</summary>
+        <pre id="rawJson">{}</pre>
+      </details>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site">
+  <span class="note">
+    API may take 30 seconds to wake up on first request (Render free tier).
+  </span>
+</footer>
+
+<script>
+/* =============================================================================
+ * Demo client for the Credit Risk Decision Engine API.
+ *
+ * The backend is a FastAPI service that exposes POST /score. The schema
+ * accepts an `applicant_id` plus any subset of the model's ~100 features;
+ * any missing feature is imputed server-side with the training-set median.
+ * We send the few fields the user provides, plus the derived ratios and
+ * EXT_SOURCE aggregates that mirror the training pipeline so the scored
+ * record is internally consistent.
+ * ============================================================================= */
+
+// ---------- Constants ----------
+
+// Categorical encodings must match the LabelEncoder fit in src/train.py
+// (sorted-unique-value order). These mirror dashboard/app.py.
+const GENDER_ENCODING = { F: 0, M: 1 };
+const EDUCATION_ENCODING = {
+  "Academic degree":               0,
+  "Higher education":              1,
+  "Incomplete higher":             2,
+  "Lower secondary":               3,
+  "Secondary / secondary special": 4,
+};
+
+const REQUEST_TIMEOUT_MS = 60_000;  // generous: Render free tier cold-start
+
+// ---------- DOM helpers ----------
+
+const $ = (id) => document.getElementById(id);
+
+const els = {
+  form:         $("scoreForm"),
+  submitBtn:    $("submitBtn"),
+  btnLabel:     $("btnLabel"),
+  btnSpinner:   $("btnSpinner"),
+  apiUrl:       $("apiUrl"),
+  errorBox:     $("errorBox"),
+  resultCard:   $("resultCard"),
+  decisionBadge:$("decisionBadge"),
+  decisionLabel:$("decisionLabel"),
+  decisionProb: $("decisionProb"),
+  riskBand:     $("riskBand"),
+  probPct:      $("probPct"),
+  reasonsBlock: $("reasonsBlock"),
+  reasonsList:  $("reasonsList"),
+  rawJson:      $("rawJson"),
+};
+
+// ---------- Form → API payload ----------
+
+function readForm() {
+  // Returns either a validated form object or { error: "..." }.
+  const num = (id) => Number($(id).value);
+  const ext1 = num("ext1"), ext2 = num("ext2"), ext3 = num("ext3");
+  const age  = num("age");
+  const income = num("income"), credit = num("credit"), annuity = num("annuity");
+
+  const inRange = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
+
+  // Tag invalid fields visually so the user can see what to fix.
+  const checks = [
+    ["ext1", inRange(ext1, 0, 1)],
+    ["ext2", inRange(ext2, 0, 1)],
+    ["ext3", inRange(ext3, 0, 1)],
+    ["age",  inRange(age, 18, 70)],
+    ["income",  income > 0],
+    ["credit",  credit > 0],
+    ["annuity", annuity > 0],
+  ];
+  let firstBad = null;
+  for (const [id, ok] of checks) {
+    $(id).closest(".field").classList.toggle("invalid", !ok);
+    if (!ok && !firstBad) firstBad = id;
+  }
+  if (firstBad) {
+    return { error: `Please correct the highlighted field: ${firstBad}` };
+  }
+
+  return {
+    ext1, ext2, ext3, age, income, credit, annuity,
+    gender:    $("gender").value,
+    education: $("education").value,
+  };
+}
+
+function buildPayload(form) {
+  // Map form fields to the model's expected feature names. Derived features
+  // (EXT_SOURCE_*, ratios) are computed here so the backend doesn't have to
+  // mix user values with median-imputed derivatives.
+  const ext = [form.ext1, form.ext2, form.ext3];
+  const ext_mean = (ext[0] + ext[1] + ext[2]) / 3;
+  const ext_min  = Math.min(...ext);
+  const ext_wtd  = (ext[0] * 1 + ext[1] * 2 + ext[2] * 3) / 6;
+
+  return {
+    applicant_id: `demo_${Date.now()}`,
+
+    // Direct fields
+    EXT_SOURCE_1:        form.ext1,
+    EXT_SOURCE_2:        form.ext2,
+    EXT_SOURCE_3:        form.ext3,
+    AMT_INCOME_TOTAL:    form.income,
+    AMT_CREDIT:          form.credit,
+    AMT_ANNUITY:         form.annuity,
+    AGE_YEARS:           form.age,
+    DAYS_BIRTH:          -Math.round(form.age * 365.25),  // backend convention: negative days from today
+    CODE_GENDER:         GENDER_ENCODING[form.gender],
+    NAME_EDUCATION_TYPE: EDUCATION_ENCODING[form.education],
+
+    // Derived features (recomputed for internal consistency)
+    EXT_SOURCE_MEAN:     ext_mean,
+    EXT_SOURCE_MIN:      ext_min,
+    EXT_SOURCE_WEIGHTED: ext_wtd,
+    EXT_SOURCE_1_missing: 0,
+    CREDIT_INCOME_RATIO:  form.income  ? form.credit  / form.income  : null,
+    ANNUITY_INCOME_RATIO: form.income  ? form.annuity / form.income  : null,
+    CREDIT_TERM:          form.annuity ? form.credit  / form.annuity : null,
+  };
+}
+
+// ---------- API call ----------
+
+async function postScore(url, payload) {
+  // fetch() with a manual timeout via AbortController.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method:  "POST",
+      mode:    "cors",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(payload),
+      signal:  ctrl.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") {
+      throw new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s. The Render free tier may still be waking up — try again.`);
+    }
+    // TypeError "Failed to fetch" almost always means CORS or network down.
+    throw new Error(
+      `Network or CORS error: ${err.message}. ` +
+      `If the API URL is reachable in a separate tab, the backend probably needs ` +
+      `FastAPI's CORSMiddleware to allow browser-origin requests.`
+    );
+  }
+  clearTimeout(timer);
+
+  let body;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error(`API returned ${response.status} with a non-JSON body.`);
+  }
+
+  if (!response.ok) {
+    const detail = body?.detail || JSON.stringify(body);
+    throw new Error(`API error ${response.status}: ${detail}`);
+  }
+
+  // Sanity-check the response shape so a malformed body doesn't crash the UI.
+  if (typeof body.default_probability !== "number" || typeof body.decision !== "string") {
+    throw new Error("Malformed API response: missing default_probability or decision.");
+  }
+
+  return body;
+}
+
+// ---------- UI state ----------
+
+function setLoading(loading) {
+  els.submitBtn.disabled  = loading;
+  els.btnSpinner.hidden   = !loading;
+  els.btnLabel.textContent = loading ? "Scoring…" : "Score Applicant";
+}
+
+function showError(message) {
+  els.errorBox.innerHTML = `<strong>Could not score applicant</strong>${escapeHtml(message)}`;
+  els.errorBox.hidden = false;
+  els.resultCard.hidden = true;
+}
+
+function clearError() {
+  els.errorBox.hidden = true;
+  els.errorBox.textContent = "";
+}
+
+function renderResult(payload, raw) {
+  const decision = raw.decision;            // APPROVE | REVIEW | REJECT
+  const band     = raw.risk_band;
+  const prob     = raw.default_probability;
+
+  els.decisionBadge.classList.remove("APPROVE", "REVIEW", "REJECT");
+  els.decisionBadge.classList.add(decision);
+  els.decisionLabel.textContent = decision;
+  els.decisionProb.textContent  = `predicted default probability ${formatPct(prob)}`;
+
+  els.riskBand.textContent = band;
+  els.probPct.textContent  = formatPct(prob);
+
+  const reasons = Array.isArray(raw.adverse_action_reasons) ? raw.adverse_action_reasons : [];
+  if (reasons.length > 0) {
+    els.reasonsList.innerHTML = "";
+    for (const r of reasons) {
+      const li = document.createElement("li");
+      li.textContent = r;
+      els.reasonsList.appendChild(li);
+    }
+    els.reasonsBlock.hidden = false;
+  } else {
+    els.reasonsBlock.hidden = true;
+  }
+
+  els.rawJson.textContent = JSON.stringify(raw, null, 2);
+  els.resultCard.hidden = false;
+}
+
+// ---------- Tiny utilities ----------
+
+function formatPct(p) {
+  return `${(p * 100).toFixed(2)}%`;
+}
+
+function escapeHtml(s) {
+  // Used because the error box concatenates a heading + message in innerHTML.
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+// ---------- Wire it up ----------
+
+els.form.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  clearError();
+
+  const form = readForm();
+  if (form.error) {
+    showError(form.error);
+    return;
+  }
+
+  const url = els.apiUrl.value.trim();
+  if (!url) {
+    showError("Please enter the API endpoint URL above.");
+    return;
+  }
+
+  const payload = buildPayload(form);
+
+  setLoading(true);
+  try {
+    const raw = await postScore(url, payload);
+    renderResult(payload, raw);
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    setLoading(false);
+  }
+});
+</script>
+</body>
+</html>
