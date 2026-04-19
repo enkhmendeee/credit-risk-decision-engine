@@ -149,8 +149,13 @@ make docker-stop
 
 [Analyst Dashboard](https://credit-risk-decision-engine-enkhmend.streamlit.app)  
 [API Docs](https://credit-risk-decision-engine.onrender.com/docs)  
-[MLflow UI](https://your-mlflow-link.com)
 ```
+
+---
+
+### MLflow Experiment Tracking
+
+![MLflow Experiments](streamlit_artifacts/mlflow_screenshot.png)
 
 ---
 
