@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
-import mlflow
 import numpy as np
 import pandas as pd
 from sklearn.calibration import calibration_curve
@@ -29,30 +28,9 @@ from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier
 
 from .config import load_config, repo_root
-
-
-class IsotonicCalibratedModel:
-    """Wrap a fitted binary classifier with an isotonic-regression calibrator.
-
-    Exposes the sklearn ``predict_proba`` / ``predict`` interface so downstream
-    code (risk policy, SHAP explainers) can treat it as a drop-in model. The
-    raw tree model is kept accessible as ``base_model`` because SHAP runs on
-    the tree, not the post-hoc calibrator.
-    """
-
-    def __init__(self, base_model, iso_reg: IsotonicRegression):
-        self.base_model = base_model
-        self.iso_reg = iso_reg
-
-    def predict_proba(self, X) -> np.ndarray:
-        """Return calibrated class probabilities, shape ``(n, 2)``."""
-        raw = self.base_model.predict_proba(X)[:, 1]
-        cal = self.iso_reg.predict(raw)
-        return np.column_stack([1 - cal, cal])
-
-    def predict(self, X) -> np.ndarray:
-        """Hard predictions at ``p >= 0.5`` on calibrated probability."""
-        return (self.predict_proba(X)[:, 1] >= 0.5).astype(int)
+# Re-exported so that pickles serialised with ``src.train.IsotonicCalibratedModel``
+# (the original module path) still resolve after the class moved to ``src.models``.
+from .models import IsotonicCalibratedModel  # noqa: F401
 
 
 def _ks_statistic(y_true, y_prob) -> float:
@@ -251,6 +229,7 @@ def _save_feature_importance_plot(
 
 def _log_portfolio_metrics(model, X_test, y_test, t_low: float, t_high: float):
     """Log conservative-scenario portfolio metrics to the active MLflow run."""
+    import mlflow  # lazy: keeps mlflow optional for non-training callers
     # Lazy import to avoid a policy -> train cycle at import time.
     from .policy import simulate_portfolio
 
@@ -270,6 +249,8 @@ def _run_lr_experiment(
     cfg: dict[str, Any], timestamp: str,
 ) -> dict[str, float]:
     """Fit + evaluate logistic regression inside a tracked MLflow run."""
+    import mlflow  # lazy: keeps mlflow optional for non-training callers
+
     run_name = f"logistic_regression_{timestamp}"
     with mlflow.start_run(run_name=run_name):
         # -- Parameters --
@@ -331,6 +312,8 @@ def _run_xgb_experiment(
     fairness notebook) is also overwritten here so ``models/`` stays in sync
     with the best tracked run.
     """
+    import mlflow  # lazy: keeps mlflow optional for non-training callers
+
     run_name = f"xgboost_calibrated_{timestamp}"
     with mlflow.start_run(run_name=run_name):
         xgb_params = cfg["model"]["params"]
@@ -402,6 +385,8 @@ def main() -> dict[str, dict[str, float]]:
     run is tagged with a timestamp so the MLflow UI shows them as separate
     comparable entries.
     """
+    import mlflow  # lazy: keeps mlflow optional for non-training callers
+
     cfg = load_config()
 
     # Resolve tracking_uri to an absolute ``file:`` path (repo-root relative).

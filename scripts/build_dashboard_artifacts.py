@@ -27,7 +27,7 @@ from sklearn.preprocessing import LabelEncoder
 
 from src.config import load_config, repo_root
 from src.policy import assign_risk_band
-from src.train import IsotonicCalibratedModel  # noqa: F401  (pickle needs it)
+from src.models import IsotonicCalibratedModel  # noqa: F401  (pickle needs it)
 
 
 SHAP_SAMPLE_N = 5000

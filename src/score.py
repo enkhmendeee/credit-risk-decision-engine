@@ -15,9 +15,8 @@ import numpy as np
 import pandas as pd
 
 from .config import load_config, repo_root
+from .models import IsotonicCalibratedModel  # noqa: F401  (pickle.load needs it)
 from .policy import DEFAULT_T_HIGH, DEFAULT_T_LOW, assign_risk_band
-# Re-export so ``pickle.load`` can resolve the wrapper class from this module.
-from .train import IsotonicCalibratedModel  # noqa: F401
 
 # --- Adverse-action configuration (mirrors notebooks/05_explainability) ---
 
