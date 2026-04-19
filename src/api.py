@@ -25,6 +25,7 @@ from typing import Any
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, create_model
 from sklearn.preprocessing import LabelEncoder
@@ -218,6 +219,13 @@ app = FastAPI(
     version=API_VERSION,
     description="Inference service for the calibrated XGBoost credit-risk model.",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
