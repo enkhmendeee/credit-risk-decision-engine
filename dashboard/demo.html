@@ -525,10 +525,15 @@ const els = {
 
 function readForm() {
   // Returns either a validated form object or { error: "..." }.
-  const num = (id) => Number($(id).value);
-  const ext1 = num("ext1"), ext2 = num("ext2"), ext3 = num("ext3");
-  const age  = num("age");
-  const income = num("income"), credit = num("credit"), annuity = num("annuity");
+  // Use parseFloat / parseInt explicitly so values are JS numbers, never strings.
+  // (Number() and the unary + operator can return surprising results for things
+  // like empty strings; the explicit parsers behave predictably here.)
+  const flt = (id) => parseFloat($(id).value);
+  const int = (id) => parseInt($(id).value, 10);
+
+  const ext1 = flt("ext1"), ext2 = flt("ext2"), ext3 = flt("ext3");
+  const age  = int("age");
+  const income = flt("income"), credit = flt("credit"), annuity = flt("annuity");
 
   const inRange = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
 
@@ -562,23 +567,36 @@ function buildPayload(form) {
   // Map form fields to the model's expected feature names. Derived features
   // (EXT_SOURCE_*, ratios) are computed here so the backend doesn't have to
   // mix user values with median-imputed derivatives.
-  const ext = [form.ext1, form.ext2, form.ext3];
-  const ext_mean = (ext[0] + ext[1] + ext[2]) / 3;
-  const ext_min  = Math.min(...ext);
-  const ext_wtd  = (ext[0] * 1 + ext[1] * 2 + ext[2] * 3) / 6;
+  //
+  // Defensive coercion: re-run parseFloat / parseInt on every numeric field
+  // even though readForm() already parsed them. This guarantees every
+  // numeric leaf in the JSON body is a JavaScript number — never a string,
+  // never an array, never scientific-notation text like "[4.9135506E-1]".
+  const ext1 = parseFloat(form.ext1);
+  const ext2 = parseFloat(form.ext2);
+  const ext3 = parseFloat(form.ext3);
+
+  const income  = parseFloat(form.income);
+  const credit  = parseFloat(form.credit);
+  const annuity = parseFloat(form.annuity);
+  const age     = parseInt(form.age, 10);
+
+  const ext_mean = (ext1 + ext2 + ext3) / 3;
+  const ext_min  = Math.min(ext1, ext2, ext3);
+  const ext_wtd  = (ext1 * 1 + ext2 * 2 + ext3 * 3) / 6;
 
   return {
     applicant_id: `demo_${Date.now()}`,
 
-    // Direct fields
-    EXT_SOURCE_1:        form.ext1,
-    EXT_SOURCE_2:        form.ext2,
-    EXT_SOURCE_3:        form.ext3,
-    AMT_INCOME_TOTAL:    form.income,
-    AMT_CREDIT:          form.credit,
-    AMT_ANNUITY:         form.annuity,
-    AGE_YEARS:           form.age,
-    DAYS_BIRTH:          -Math.round(form.age * 365.25),  // backend convention: negative days from today
+    // Direct fields (all numbers)
+    EXT_SOURCE_1:        ext1,
+    EXT_SOURCE_2:        ext2,
+    EXT_SOURCE_3:        ext3,
+    AMT_INCOME_TOTAL:    income,
+    AMT_CREDIT:          credit,
+    AMT_ANNUITY:         annuity,
+    AGE_YEARS:           age,
+    DAYS_BIRTH:          -Math.round(age * 365.25),  // backend convention: negative days from today
     CODE_GENDER:         GENDER_ENCODING[form.gender],
     NAME_EDUCATION_TYPE: EDUCATION_ENCODING[form.education],
 
@@ -587,9 +605,9 @@ function buildPayload(form) {
     EXT_SOURCE_MIN:      ext_min,
     EXT_SOURCE_WEIGHTED: ext_wtd,
     EXT_SOURCE_1_missing: 0,
-    CREDIT_INCOME_RATIO:  form.income  ? form.credit  / form.income  : null,
-    ANNUITY_INCOME_RATIO: form.income  ? form.annuity / form.income  : null,
-    CREDIT_TERM:          form.annuity ? form.credit  / form.annuity : null,
+    CREDIT_INCOME_RATIO:  income  ? credit  / income  : null,
+    ANNUITY_INCOME_RATIO: income  ? annuity / income  : null,
+    CREDIT_TERM:          annuity ? credit  / annuity : null,
   };
 }
 

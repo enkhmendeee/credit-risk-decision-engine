@@ -232,11 +232,34 @@ app.add_middleware(
 # --- Helpers ------------------------------------------------------------------
 
 
+def _coerce_numeric(value: Any) -> Any:
+    """Convert string-encoded numbers to ``float``; pass everything else through.
+
+    The Pydantic ``Applicant`` schema accepts ``float | int | str | None`` for
+    each feature so that non-numeric categoricals (already label-encoded or not)
+    can flow through unchanged. But XGBoost won't accept a string where it
+    expects a float, so any value the caller sent as a string that *parses* as
+    a number is coerced here. Strings that aren't numeric (e.g. an unencoded
+    categorical) are returned untouched and will fail downstream with a clearer
+    error than the silent type confusion this helper avoids.
+    """
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return value
+    return value
+
+
 def _fill_missing(raw: dict[str, Any]) -> dict[str, Any]:
-    """Replace any ``None`` feature value with the training-set median."""
+    """Replace any ``None`` feature value with the training-set median.
+
+    Also coerces string-encoded numbers (e.g. ``"0.49"``) to ``float`` so that
+    careless clients that JSON-encode numbers as strings still score correctly.
+    """
     medians = state["medians"]
     return {
-        f: (raw[f] if raw.get(f) is not None else medians[f])
+        f: (_coerce_numeric(raw[f]) if raw.get(f) is not None else medians[f])
         for f in state["feature_names"]
     }
 
