@@ -53,7 +53,28 @@ if not logger.handlers:
 # cost is a one-time pickle load on import.
 
 _cfg = load_config()
-_MODEL_PATH = repo_root() / _cfg["output"]["model_dir"] / "xgboost_calibrated.pkl"
+
+
+def _resolve_artifact(filename: str, primary_dir: Path) -> Path:
+    """Resolve an artifact path with a streamlit_artifacts/ deploy fallback.
+
+    Returns the first existing match between the primary location (local/dev,
+    e.g. ``models/`` or ``data/``) and the committed ``streamlit_artifacts/``
+    bundle that ships in the Render / Streamlit Cloud deploy. Returns the
+    primary path unchanged if neither exists, so the caller can produce a
+    clear ``FileNotFoundError`` against the expected location.
+    """
+    primary = primary_dir / filename
+    fallback = repo_root() / "streamlit_artifacts" / filename
+    if primary.exists():
+        return primary
+    if fallback.exists():
+        return fallback
+    return primary
+
+
+_MODEL_DIR = repo_root() / _cfg["output"]["model_dir"]
+_MODEL_PATH = _resolve_artifact("xgboost_calibrated.pkl", _MODEL_DIR)
 
 logger.info("loading model from %s", _MODEL_PATH)
 MODEL = load_model(_MODEL_PATH)
@@ -140,13 +161,14 @@ state: dict[str, Any] = {}
 def _compute_training_medians() -> dict[str, float]:
     """Load per-feature medians used to impute missing fields at inference.
 
-    Prefers a pre-computed ``models/feature_medians.json`` so containers
-    built without ``data/`` are self-sufficient. Falls back to computing
-    from the training CSV for local/dev runs, and caches the result back
-    to JSON so the next startup (and the next Docker build) can skip the
-    CSV path entirely.
+    Lookup order:
+        1. ``models/feature_medians.json``                 — local dev / training output
+        2. ``streamlit_artifacts/feature_medians.json``    — committed deploy bundle
+        3. Recompute from ``data/processed/train_engineered.csv`` and cache
+           the result to ``models/feature_medians.json`` so the next startup
+           (and the next Docker build) can skip the CSV path entirely.
     """
-    json_path = _MODEL_PATH.parent / "feature_medians.json"
+    json_path = _resolve_artifact("feature_medians.json", _MODEL_DIR)
     if json_path.exists():
         with open(json_path, "r") as f:
             return {k: float(v) for k, v in json.load(f).items()}

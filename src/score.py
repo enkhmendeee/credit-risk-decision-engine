@@ -89,14 +89,29 @@ def _format_reason(feat: str, value: float) -> str:
 def load_model(path: str | Path | None = None):
     """Load the calibrated model from disk.
 
-    Defaults to ``models/xgboost_calibrated.pkl`` resolved from the repo root.
+    When ``path`` is None, tries (in order):
+        1. ``models/xgboost_calibrated.pkl``           — local dev / training output
+        2. ``streamlit_artifacts/xgboost_calibrated.pkl`` — committed deploy bundle
+
+    The second path is what the Render / Streamlit Cloud deploys see, since
+    ``models/*.pkl`` is gitignored.
+
     The returned object is an :class:`IsotonicCalibratedModel` that exposes
     both calibrated probabilities (via ``predict_proba``) and the underlying
     tree model (``base_model``) for SHAP.
     """
     if path is None:
         cfg = load_config()
-        path = repo_root() / cfg["output"]["model_dir"] / "xgboost_calibrated.pkl"
+        candidates = [
+            repo_root() / cfg["output"]["model_dir"] / "xgboost_calibrated.pkl",
+            repo_root() / "streamlit_artifacts" / "xgboost_calibrated.pkl",
+        ]
+        path = next((p for p in candidates if p.exists()), None)
+        if path is None:
+            raise FileNotFoundError(
+                "xgboost_calibrated.pkl not found in any of: "
+                + ", ".join(str(p) for p in candidates)
+            )
     with open(path, "rb") as f:
         return pickle.load(f)
 

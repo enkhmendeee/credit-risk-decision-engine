@@ -147,7 +147,7 @@ make docker-stop
 
 ```bash
 
-[Analyst Dashboard](https://your-streamlit-link.streamlit.app)  
+[Analyst Dashboard](https://credit-risk-decision-engine-enkhmend.streamlit.app)  
 [API Docs](https://your-api-link.com/docs)  
 [MLflow UI](https://your-mlflow-link.com)
 ```
