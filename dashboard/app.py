@@ -38,14 +38,23 @@ from src.score import load_model, score_applicant  # noqa: E402
 
 CFG = load_config()
 
+STREAMLIT_ARTIFACTS = REPO_ROOT / "streamlit_artifacts"
+
+
+def _resolve(filename: str, fallback: Path) -> Path:
+    """Prefer the bundled streamlit_artifacts copy (for cloud deploys); fall back to the original."""
+    bundled = STREAMLIT_ARTIFACTS / filename
+    return bundled if bundled.exists() else fallback
+
+
 PATHS = {
-    "calibration_curve":  REPO_ROOT / "reports" / "calibration_curve.png",
-    "feature_importance": REPO_ROOT / "reports" / "feature_importance.csv",
-    "test_scores":        REPO_ROOT / "data" / "test_scores.csv",
-    "fairness_metrics":   REPO_ROOT / "data" / "fairness_metrics.csv",
+    "calibration_curve":  _resolve("calibration_curve.png",  REPO_ROOT / "reports" / "calibration_curve.png"),
+    "feature_importance": _resolve("feature_importance.csv", REPO_ROOT / "reports" / "feature_importance.csv"),
+    "test_scores":        _resolve("test_scores.csv",        REPO_ROOT / "data" / "test_scores.csv"),
+    "fairness_metrics":   _resolve("fairness_metrics.csv",   REPO_ROOT / "data" / "fairness_metrics.csv"),
     "processed_data":     REPO_ROOT / CFG["data"]["processed_dir"] / "train_engineered.csv",
-    "medians":            REPO_ROOT / CFG["output"]["model_dir"] / "feature_medians.json",
-    "model":              REPO_ROOT / CFG["output"]["model_dir"] / "xgboost_calibrated.pkl",
+    "medians":            _resolve("feature_medians.json",   REPO_ROOT / CFG["output"]["model_dir"] / "feature_medians.json"),
+    "model":              _resolve("xgboost_calibrated.pkl", REPO_ROOT / CFG["output"]["model_dir"] / "xgboost_calibrated.pkl"),
 }
 
 T_LOW  = float(CFG["policy"]["low_threshold"])

@@ -53,3 +53,7 @@ mlruns/
 mlartifacts/
 
 prompt.txt
+
+# Dashboard deployment bundle — explicitly tracked (overrides data/** and models/*.pkl above)
+!streamlit_artifacts/
+!streamlit_artifacts/**
