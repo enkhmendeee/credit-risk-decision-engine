@@ -187,4 +187,4 @@ A full model card — intended use, training data, performance breakdowns, fairn
 
 ## Author
 
-Math-CS student from Mongolia. Built to address real credit-access challenges in emerging markets with thin bureau infrastructure.
+Enkhmend Nergui, Math-CS student from Mongolia. Built to address real credit-access challenges in emerging markets with thin bureau infrastructure.
